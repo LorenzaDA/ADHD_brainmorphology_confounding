@@ -1,0 +1,139 @@
+---
+title: "ABCD_RDS"
+author: "Hannah Kim"
+date: "1/15/2020"
+output:
+  html_document: default
+  word_document: default
+---
+
+
+```{r setup, include=FALSE}
+
+# https://rpubs.com/emwozniak/195942
+library(knitr)
+library(mice)
+library(naniar)
+library(tidyverse)
+library(dplyr)
+library("RNHANES")
+library("VIM")
+library("Amelia")
+library("mitools")
+library("mix")
+library("mice")
+library("lattice")
+library(table1)
+library(boot)
+
+## setting working directory
+opts_knit$set(root.dir = "/Users/hannah/Documents/Research/ABCD Research/Confounding project")
+
+import <- readRDS("nda2.0.1.RDS")
+
+# Get var names
+varnames <- dput(names(import))
+write.csv(varnames, file="varnames.csv")
+myvars <- readLines("myvars_toupload.csv")
+
+####################################
+# Subset vars from my excel list   #
+mydata <- import[myvars]
+####################################
+# Subset vars to baseline arm 1 and acceptable QC 
+mydata <- subset(mydata, mydata$event_name == "baseline_year_1_arm_1" & mydata$fsqc_qc == "accept")
+# QC: 462 reject's, 337 NA's
+####################################
+
+# adding 'sub-' to ID's
+mydata$src_subject_id <- gsub('_', '', mydata$src_subject_id)
+mydata$src_subject_id <- paste("sub-", mydata$src_subject_id, sep="")
+
+write.csv(mydata,file="abcd_dataset.csv")
+```
+
+
+
+# Table 1
+
+```{r, echo = FALSE, results='asis'}
+
+label(mydata$interview_age) <- "Age"
+label(mydata$sex_at_birth) <- "Sex"
+label(mydata$race_ethnicity) <- "Race/Ethnicity"
+label(mydata$household.income) <- "Household Income"
+label(mydata$high.educ) <- "Highest Education"
+label(mydata$devhx_8_tobacco_p) <- "Tobacco use during preg"
+label(mydata$devhx_8_alcohol_p) <- "Alcohol use during preg"
+label(mydata$devhx_8_marijuana_p) <- "Marijuana use during preg"
+label(mydata$devhx_8_coc_crack_p) <- "Cocaine use during preg"
+label(mydata$devhx_8_her_morph_p) <- "Morphine use during preg"
+label(mydata$devhx_8_oxycont_p) <- "Oxycontin use during preg"
+label(mydata$devhx_3_age_at_birth_mother_p) <- "Mother age at birth"
+label(mydata$asr_scr_totprob_t) <- "Primary caregiver psychopathology"
+label(mydata$pea_wiscv_tss) <- "Child IQ"
+
+
+
+table1(~  + interview_age + sex_at_birth + race_ethnicity  + household.income + high.educ + devhx_8_tobacco_p + devhx_8_alcohol_p + devhx_8_marijuana_p + devhx_8_coc_crack_p + devhx_8_her_morph_p + devhx_8_oxycont_p , data=mydata)
+
+
+```
+
+
+```{r, muissingness characterization}
+
+# percent of missingness for each variable
+care_vars <- c("interview_age","sex_at_birth" , "race_ethnicity","household.income", "high.educ" , "devhx_8_tobacco_p" , "devhx_8_alcohol_p" , "devhx_8_marijuana_p" , "devhx_8_coc_crack_p", "devhx_8_her_morph_p", "devhx_8_oxycont_p","cbcl_scr_syn_attention_t","devhx_3_age_at_birth_mother_p","asr_scr_totprob_t","pea_wiscv_tss","cbcl_scr_syn_aggressive_t","cbcl_scr_syn_anxdep_t","devhx_12a_born_premature_p","rel_family_id")
+  
+p <- function(x) {sum(is.na(x))/length(x)*100}
+x <- apply(mydata, 2, p)
+sort(x)
+
+
+md.pattern(mydata)
+
+library(naniar)
+gg_miss_var(mydata, show_pct = T)
+
+```
+
+
+
+```{r, MICE}
+
+# We run the mice code with 0 iterations 
+imp <- mice(mydata, maxit=0)
+
+# Extract predictorMatrix and methods of imputation 
+predM = imp$predictorMatrix
+meth = imp$method
+
+# Setting values of variables I'd like to leave out to 0 in the predictor matrix
+predM[, c("src_subject_id")]=0
+predM[, c("site_id_l")]=0
+predM[, c("interview_age")]=0
+predM[, c("abcd_site")]=0
+predM[, c("event_name")]=0
+predM[, c("fsqc_qc")]=0
+predM[, c("mrif_score")]=0
+predM[, c("rel_family_id")]=0
+
+
+# With this command, we tell mice to impute the data, create 5 datasets, use predM as the predictor matrix and don't print the imputation process. 
+imp2 <- mice(mydata, maxit = 5, 
+             predictorMatrix = predM, 
+             method = "cart", print =  T)
+
+
+# #rename the dataframe to something you like....this is handy when you re-load the mice obj back into R later
+final_data <- imp2
+
+# #save out the mice object as an Rdata structure (which can be 'load('fsBully.imp.14sept2018.RData')' later)
+saveRDS(final_data, "imputed_dataset.rds",version=2)
+
+xyz <- readRDS("imputed_dataset.rds")
+str(xyz)
+
+```
+

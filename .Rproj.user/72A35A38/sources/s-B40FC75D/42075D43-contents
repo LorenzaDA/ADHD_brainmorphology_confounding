@@ -10,6 +10,7 @@
 
 facred <- function(x, mer, new = NULL, clps = " || "){
   le <- levels(x)
+  print(le)
   le2 <- `names<-`(as.list(le), le)
   ind <- sapply(le2, function(y) y %in% mer) %>% unname
   if (is.null(new)) new <- paste(mer, collapse = clps) %>% as.character
@@ -19,9 +20,8 @@ facred <- function(x, mer, new = NULL, clps = " || "){
 }
 
 #### PACKAGES ####
-x <- c("data.table", "foreign", "dplyr", "GGally", "car", "MASS", "mice")
+x <- c("data.table", "foreign", "dplyr", "mice")
 lapply(x, require, character.only = T) 
-
 
 ###################
 # 0. Data preparation
@@ -39,19 +39,22 @@ lapply(x, require, character.only = T)
 # set directories - not specified here for privacy 
 
 working_directory <- "PATH/TO/YOUR/WORKING/DIRECTORY"
-dir_data <- file.path(working_directory, "data")
+dir_data <- file.path(working_directory, "datasets")
 dir_descriptives <- file.path(working_directory, "descriptives")
-dir_imp <- file.path(working_directory, "imp")
 
 if (!dir.exists(dir_data)) dir.create(dir_data)
 if (!dir.exists(dir_descriptives)) dir.create(dir_descriptives)
-if (!dir.exists(dir_imp)) dir.create(dir_imp)
 
 # get the names of all datasets in the folder 
 files_idm <- c("CHILD-ALLGENERALDATA_29012018.sav",
                "130815_ GEDRAGSGROEP Maternal smoking pregnancy.sav",
                "GR1003-BSI D1_22112016.sav")
-files_idc <- c()
+files_idc <- c("Cannabis_variable.sav", 
+               "CHILDCBCL9_10082016.sav", 
+               "CHILDMRI_Core_data_distribution_28112017.sav",
+               "CHILDSONIQ5_06042012.sav", 
+               "F9_MRI_Freesurfer_global_2016_12_09.sav")
+
 files_genr <- c(files_idm, files_idc)
 paths_genr <- file.path(dir_data, files_genr)
 
@@ -67,7 +70,7 @@ data <- lapply(paths_genr, function(x)
 data[seq_along(files_idm)] <- 
   lapply(data[seq_along(files_idm)], data.table::setorder, idm)
 data[-seq_along(files_idm)] <- 
-  apply(data[-seq_along(files_idm)], data.table::setorder, idc)
+  lapply(data[-seq_along(files_idm)], data.table::setorder, idc)
 
 ####
 # STEP 2: Merge data
@@ -99,10 +102,10 @@ data <- Reduce(function(d1, d2) merge(d1, d2, by = intersect(names(d1), names(d2
 vars <- c("idc", "idm", "sum_att_9m", "qdeclgi_f9", "t1_asset_nii", 
           "usable_fs_f9_final", "braces_mri_f9", "mother", "exclude_incidental",
           "mri_consent", "twin", "ethninfv3", "gender", "agechildbrainmrif9", 
-          "age_m_v2", "educm5", "income5", "gestbir", "weight", "gestbir", 
+          "age_m_v2", "educm5", "income5", "gestbir", "weight",
           "msmoke", "can_m", "gsi", "f0300178", "educm","knicr_tbv_f9", "etiv_f9")
 
-data[, vars, with = FALSE] 
+data <- data[, vars, with = FALSE] 
 
 data[, idc := as.character(idc)]
 data[, idm := as.character(idm)]
@@ -236,7 +239,7 @@ age_m_v2_sd <- sd(data$age_m_v2, na.rm = T)
 gestbir_sd <- sd(data$gestbir, na.rm = T) 
 iq_sd <- sd(data$f0300178, na.rm = T)
 age_sd <- sd(data$agechildbrainmrif9, na.rm = T)
-sd_all <- cbind(gsisd, age_m_v2_sd, gestbir_sd, iq_sd, age_sd, agg_sd)  
+sd_all <- cbind(gsisd, age_m_v2_sd, gestbir_sd, iq_sd, age_sd)  
 
 write.csv(sd_all,
           file.path(dir_descriptives, "sds.csv"), 
@@ -299,4 +302,4 @@ imp <- mice::mice(data,
                   visit = visit2)
 				  
 
-saveRDS(imp, file.path(dir_imp, "imp30-30_010321.rds"))
+saveRDS(imp, file.path(dir_data, "imp30-30_010321.rds"))
