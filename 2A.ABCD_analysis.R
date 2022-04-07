@@ -10,7 +10,7 @@ dir_tmp <- file.path(dir_wd, "dir_tmp")
 dir_subj <- Sys.getenv("SUBJECTS_DIR")
 dir_out <-file.path(dir_wd, "qdecr")
 
-project_date <- "0522"
+project_date <- "0304"
 
 # Read data
 imp <- readRDS("imputed_dataset.rds")
@@ -31,38 +31,38 @@ long1 <- complete(imp, action = "long", include = TRUE)
 long2 <- subset(long1, long1$src_subject_id_final == 1)
 imp_f <- as.mids(long2)
 
-# QDECR MODELS
-n_cores = 10
+#### QDECR MODELS ####
 
-hemis = c("lh", "rh")
+# set determinant, outcome, and covariates
+det <- "cbcl_scr_syn_attention_r"
+out <- c("qdecr_area", "qdecr_volume")
 
-for (hemi in hemis){
-  
-  a <- qdecr_fastlm(qdecr_area ~ cbcl_scr_syn_attention_r + race_ethnicity  + sex_at_birth + 
-                      interview_age + abcd_site + high.educ + household.income + I(devhx_3_age_at_birth_mother_p>29) + 
-                      devhx_8_tobacco_p + devhx_8_marijuana_p + I(asr_scr_totprob_r>51),
-                    data = imp_f,
-                    id ="src_subject_id",
-                    hemi = hemi,
-                    n_cores = n_cores,
-                    dir_tmp = dir_tmp,
-                    dir_out = dir_out,
-                    project = paste0("bias_", project_date),
-                    clobber = TRUE)
-  
-  a <- qdecr_fastlm(qdecr_volume ~ cbcl_scr_syn_attention_r + race_ethnicity  + sex_at_birth + 
-                      interview_age + abcd_site + high.educ + household.income + I(devhx_3_age_at_birth_mother_p>29) + 
-                      devhx_8_tobacco_p + devhx_8_marijuana_p + I(asr_scr_totprob_r>51),
-                    data = imp_f,
-                    id = "src_subject_id",
-                    hemi = hemi,
-                    n_cores = n_cores,
-                    dir_tmp = dir_tmp,
-                    dir_out = dir_out,
-                    project = paste0("bias_", project_date),
-                    clobber = TRUE)
-  
+# change according to confounders
+conf1 <- c("race_ethnicity","sex_at_birth","interview_age","abcd_site")
+conf2 <- c(conf1,"high.educ","household.income","devhx_3_age_at_birth_mother_p")
+conf3 <- c(conf2, "devhx_8_tobacco_p", "devhx_8_marijuana_p", "asr_scr_totprob_r")
+conf4 <- c(conf3, "cbcl_scr_syn_aggressive_r")
+conf5 <- c(conf3, "pea_wiscv_tss")
+conf <- list(conf1,conf2,conf3,conf4,conf5)
+base_f <- lapply(conf,function(x)paste("~",det,"+",paste(x,collapse="+")))
+f <- lapply(base_f,function(x) paste(out,x))
+
+
+for (i in seq_along(f)){
+  for (j in seq_along(f[[i]])) {
+    project <- paste0("M",i,"_",project_date)
+    for (hemi in hemis){
+      vw <- qdecr_fastlm(as.formula(f[[i]][[j]]),
+                         data = imp,
+                         id = "src_subject_id",
+                         hemi = hemi,
+                         dir_tmp = dir_tmp,
+                         dir_out = dir_out,
+                         project = project,
+                         clobber = T,
+                         n_cores = 10)
+    }
+  }
 }
-
 
 
