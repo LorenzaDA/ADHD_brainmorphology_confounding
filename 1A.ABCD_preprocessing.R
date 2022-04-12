@@ -21,6 +21,7 @@ data <- import[myvars]
 data <- subset(data, 
                  event_name == "baseline_year_1_arm_1" &        # baseline arm 1
                    fsqc_qc == "accept" &                        # acceptable image quality
+                   !is.na(cbcl_scr_syn_attention_r) &           # remove missings
                    rel_relationship != "twin" &                 # remove twins
                    rel_relationship != "triplet")               # remove triplets
 
@@ -38,7 +39,7 @@ data <- left_join(data, subid, by ="src_subject_id")
 data <- data %>% filter(yes != 1 | is.na(yes)) %>%
   dplyr::select(-c("yes"))
 
-write.csv(data,file="abcd_confounding_clean.csv")
+write.csv(data, file = "abcd_confounding_clean.csv")
 
 # Table 1
 label(data$interview_age) <- "Age"
@@ -69,6 +70,7 @@ exclVar <- c("src_subject_id","site_id_l","interview_age","abcd_site",
              "fsqc_qc",
              "mrif_score",
              "rel_family_id",
+             "cbcl_scr_syn_attention_r",
              "smri_vol_subcort.aseg_intracranialvolume",
              "rel_relationship")
 
