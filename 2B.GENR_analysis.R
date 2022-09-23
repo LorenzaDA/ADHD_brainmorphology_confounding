@@ -87,7 +87,7 @@ f <- lapply(outs, function(out) lapply(base_f, function(x) paste(out, x)))
 # we run a vertex wise analysis, for each hemisphere. 
 for (i in seq_along(f)) {
   for (j in seq_along(f[[i]])) {
-    project <- paste0("M", j, "_", project_date)
+    project <- paste0("M", j, "_genr_", project_date)
     for (hemi in hemis) {
       vw <- qdecr_fastlm(as.formula(f[[i]][[j]]), 
                          data = imp2,
