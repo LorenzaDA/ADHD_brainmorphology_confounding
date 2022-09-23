@@ -53,7 +53,7 @@ imp <- readRDS(file.path(dir_data, "imputed_dataset.rds"))
 # continuous
 for (i in seq_along(f)){
   for (j in seq_along(f[[i]])) {
-    project <- paste0("M", i, "_", project_date)
+    project <- paste0("M", i, "_abcd_", project_date)
     for (hemi in hemis){
       vw <- qdecr_fastlm(as.formula(f[[i]][[j]]),
                          data = imp,
