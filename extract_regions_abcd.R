@@ -21,7 +21,7 @@ setwd(dir_wd)
 #### PATHS TO PROJECTS
 
 out2 <- sub("qdecr_", "", out)
-base_name <- paste0("_", project_date, ".", out2)
+base_name <- paste0("_abcd_", project_date, ".", out2)
 
 m <- 5 # number of models
 paths_lh <- paths_rh <- list()
