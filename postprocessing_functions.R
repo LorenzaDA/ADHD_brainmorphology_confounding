@@ -85,10 +85,12 @@ quick_compose <- function(temp_mgh_file, hemi, cs, head = FALSE, text = NULL, cs
   }
   ia3 <- magick::image_append(c(nn2[1], nn2[2]))
   
+  hp_width <- 150
+  
   if (!is.null(text)){
     w <- magick::image_info(ia3)$width
     h <- magick::image_info(ia3)$height
-    wn <- h / 2
+    wn <- h / 1.5
     crop_string <- paste0(wn, "x", h, "+", 0, "+", 0)
     hp <- magick::image_crop(ia3, crop_string)
     hp <- magick::image_colorize(hp, 100, "white")
@@ -114,7 +116,7 @@ quick_compose <- function(temp_mgh_file, hemi, cs, head = FALSE, text = NULL, cs
       if (!is.null(alt_text)) hp2 <- magick::image_annotate(hp2, alt_text, size = head_size, color = "black", gravity = "center", font = font)
       hp <- magick::image_append(c(hp2, hp))
     }
-    
+
     ia3 <- magick::image_append(c(hp, ia3), stack = TRUE)
   }
   
