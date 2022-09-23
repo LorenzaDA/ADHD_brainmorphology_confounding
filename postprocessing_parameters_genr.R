@@ -35,8 +35,9 @@ conf1 <- c("ethninfv3", "agechildbrainmrif9", "gender")
 conf2 <- c(conf1, "educm5", "income5", "age_m_v2")
 conf3 <- c(conf2, "msmoke", "can_m", "gsi")
 conf4 <- c(conf3, "f0300178")
+conf5 <- c(conf3, "euler_number")
 
-conf <- list(conf1, conf2, conf3, conf4a)
+conf <- list(conf1, conf2, conf3, conf4, conf5)
 base_f <- lapply(conf, function(x) paste("~", det, "+", paste(x, collapse = "+")))
 f <- lapply(base_f, function(x) paste(out, x))
 
