@@ -1,12 +1,18 @@
 
 #### PACKAGES ####
 
-x <- c("mice", "table1", "tidyverse")
-lapply(x, require, character.only = T) 
+x <- c("data.table", "mice", "table1", "tidyverse")
+lapply(x, require, character.only = TRUE) 
 
-## setting working directory
+#### INIT ####
+
+# setting working directory
 setwd("PATH/TO/YOUR/WORKING/DIRECTORY")
 
+# define SUBJECTS_DIR
+dir_subj <- "PATH/TO/SUBJECTS/DIR"
+
+# read in data
 import <- readRDS("nda2.0.1.RDS")
 
 # Get var names
@@ -17,69 +23,85 @@ myvars <- readLines("myvars_toupload.csv")
 # Subset vars from my excel list   #
 data <- import[myvars]
 ####################################
-# Subset vars to baseline arm 1 and acceptable QC 
-data <- subset(data, 
-                 event_name == "baseline_year_1_arm_1" &        # baseline arm 1
-                   fsqc_qc == "accept" &                        # acceptable image quality
-                   !is.na(cbcl_scr_syn_attention_r) &           # remove missings
-                   rel_relationship != "twin" &                 # remove twins
-                   rel_relationship != "triplet")               # remove triplets
-
-set.seed(2020)
-data <- data[sample(nrow(data)), ] # randomly order data
-data <- data[!duplicated(data$rel_family_id), ]
 
 # adding 'sub-' to ID's
 data$src_subject_id <- gsub('_', '', data$src_subject_id)
-data$src_subject_id <- paste("sub-", data$src_subject_id, sep="")
+data$src_subject_id <- paste("sub-", data$src_subject_id, sep = "")
 
-# remove missing surface data
-subid <- read.csv("/PATH/TO/missing.rh.area.qdecr.csv")
-data <- left_join(data, subid, by ="src_subject_id")
-data <- data %>% filter(yes != 1 | is.na(yes)) %>%
-  dplyr::select(-c("yes"))
+# add euler number to data
+aseg_files <- file.path(list.files(dir_subj, full.names = TRUE), "stats", "aseg.stats") 
 
-write.csv(data, file = "abcd_confounding_clean.csv")
+euler_number <- lapply(aseg_files, function(x) {
+  suppressWarnings(system(paste("grep 'Measure SurfaceHoles'", x), intern = TRUE))
+})
+euler_number_fail <- sapply(euler_number, function(x) length(x) == 0)
+euler_number <- as.numeric(gsub("[^0-9]", "", euler_number[!euler_number_fail]))
+euler_id <- sub(".*(untar//)(.*)(/stats/aseg.stats)", "\\2", aseg_files[!euler_number_fail])
+
+euler_data <- data.frame(src_subject_id = euler_id, euler_number = euler_number)
+
+# test whether surface is missing or not
+surf_files <- file.path(list.files(dir_subj, full.names = TRUE), "surf", "rh.area.fwhm10.fsaverage.mgh") 
+surf_exists <- file.exists(surf_files)
+surf_id <- sub(".*(untar//)(.*)(/surf/rh.area.fwhm10.fsaverage.mgh)", "\\2", surf_files)
+
+surf_data <- data.frame(src_subject_id = surf_id, missing_surf = surf_exists)
+
+data <- merge(as.data.table(data), as.data.table(euler_data), all.x = TRUE)
+data <- merge(data, as.data.table(surf_data), all.x = TRUE)
+
+class(data) <- "data.frame"
+
+
+## SUBSET
+
+if_values <- c("Consider clinical referral", "Consider immediate clinical referral")
+
+data_1 <- data %>%
+    subset(event_name == "baseline_year_1_arm_1") %>%                  # baseline arm 1
+    subset(!is.na(cbcl_scr_syn_attention_r)) %>%                       # has ADHD data
+    subset(fsqc_qc == "accept") %>%                                    # acceptable image quality
+    subset(missing_surf == TRUE) %>%                                   # surface
+    subset(!mrif_score %in% if_values) %>%                             # no incidental findings
+    subset(rel_relationship != "twin") %>%                             # exclude twins
+    subset(rel_relationship != "triplet") %>%                          # exclude triplet
+    subset(!duplicated(rel_family_id))                                 # exclude siblings
+
+
+## TABLE
 
 # Table 1
-label(data$interview_age) <- "Age"
-label(data$sex_at_birth) <- "Sex"
-label(data$race_ethnicity) <- "Race/Ethnicity"
-label(data$household.income) <- "Household Income"
-label(data$high.educ) <- "Highest Education"
-label(data$devhx_8_tobacco_p) <- "Tobacco use during preg"
-label(data$devhx_8_alcohol_p) <- "Alcohol use during preg"
-label(data$devhx_8_marijuana_p) <- "Marijuana use during preg"
-label(data$devhx_8_coc_crack_p) <- "Cocaine use during preg"
-label(data$devhx_8_her_morph_p) <- "Morphine use during preg"
-label(data$devhx_8_oxycont_p) <- "Oxycontin use during preg"
-label(data$devhx_3_age_at_birth_mother_p) <- "Mother age at birth"
-label(data$asr_scr_totprob_r) <- "Primary caregiver psychopathology"
-label(data$pea_wiscv_tss) <- "Child IQ"
+label(data_1$interview_age) <- "Age"
+label(data_1$sex_at_birth) <- "Sex"
+label(data_1$race_ethnicity) <- "Race/Ethnicity"
+label(data_1$household.income) <- "Household Income"
+label(data_1$high.educ) <- "Highest Education"
+label(data_1$devhx_8_tobacco_p) <- "Tobacco use during preg"
+label(data_1$devhx_8_alcohol_p) <- "Alcohol use during preg"
+label(data_1$devhx_3_age_at_birth_mother_p) <- "Mother age at birth"
+label(data_1$asr_scr_totprob_r) <- "Primary caregiver psychopathology"
+label(data_1$pea_wiscv_tss) <- "Child IQ"
 
-
-table1(~ + interview_age + sex_at_birth + race_ethnicity + 
+table1::table1(~ + interview_age + sex_at_birth + race_ethnicity + 
          household.income + high.educ + devhx_8_tobacco_p + devhx_8_marijuana_p, 
-       data = data)
-
-## IMPUTATION
+       data = data_1)
 
 # exclude vars
-exclVar <- c("src_subject_id","site_id_l","interview_age","abcd_site",
+exclVar <- c("src_subject_id", "site_id_l", "interview_age", "abcd_site",
              "event_name",
              "fsqc_qc",
              "mrif_score",
              "rel_family_id",
              "cbcl_scr_syn_attention_r",
              "smri_vol_subcort.aseg_intracranialvolume",
-             "rel_relationship")
+             "rel_relationship", "euler_number")
 
 ## Check that the methods is pmm for continuous, logreg for binary, and polyreg for categorical (>2 levels). 
 
-ini <- mice(data, 
+ini <- mice(data_1, 
             m = 1, 
+            seed = 2020, 
             pred = quickpred(data, exclude = exclVar, method = "spearman"), 
-            seed=2020, 
             maxit = 0)
 
 pred <- ini$pred
@@ -96,12 +118,12 @@ nImp <- 5
 nIter <- 10
 
 ### Save files
-imp <- mice(data, 
+imp <- mice(data_1, 
             m = nImp, 
             pred = pred, 
             method = meth, 
             seed = 2020, 
             maxit = nIter) 
-
-# #save out the mice object as an Rdata structure (which can be 'load('fsBully.imp.14sept2018.RData')' later)
-saveRDS(imp, "imputed_dataset.rds")
+           
+# #save out the mice object as an Rdata structure
+saveRDS(imp, "datasets/imputed_dataset.rds")
