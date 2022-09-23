@@ -37,15 +37,11 @@ lapply(x, require, character.only = T)
 # STEP 1: Read in and merge the data
 
 # set project date (for later)
-project_date <- "010321"
+project_date <- "150722"
 
 # set directories - not specified here for privacy 
 working_directory <- "PATH/TO/YOUR/WORKING/DIRECTORY"
 dir_data <- file.path(working_directory, "datasets")
-dir_descriptives <- file.path(working_directory, "descriptives")
-
-if (!dir.exists(dir_data)) dir.create(dir_data)
-if (!dir.exists(dir_descriptives)) dir.create(dir_descriptives)
 
 # get the names of all datasets in the folder 
 files_idm <- c("CHILD-ALLGENERALDATA_29012018.sav",
@@ -113,29 +109,10 @@ data[, idc := as.character(idc)]
 data[, idm := as.character(idm)]
 data[, mother := as.character(mother)]
 
-####
-# STEP 4: Flow chart
-#### 
-
-# INCLUSION: Select individuals with inattention data & sufficient quality MRI data
-
-data <- data %>%
-  subset(!is.na(sum_att_9m)) %>%                                     # has ADHD data
-  subset(mri_consent == "yes") %>%                                   # has MRI consent 
-  subset(t1_asset_nii == "NO") %>%                                   # scan type
-  subset(usable_fs_f9_final == "useable") %>%                        # FS quality
-  subset(qdeclgi_f9 == "has data") %>%                               # QDECR
-  subset(braces_mri_f9 == "does not have braces") %>%                # no braces
-  subset(exclude_incidental == "include") %>%                        # no incidental findings
-  subset(twin == "No") %>%                                           # exclude twins
-  subset(!duplicated(mother))                                        # exclude siblings
-
 class(data) <- "data.frame"
 
-## Final sample = 2531 children 
-
 ####
-# STEP 5: Collapse levels in categorical variables with many categories
+# STEP 4: Collapse levels in categorical variables with many categories
 ####
 
 # Check the initial levels of the variables
@@ -209,47 +186,7 @@ for (l1 in seq_len(length(ulist))) {
 }
 
 ####
-# STEP 7: Prepare data for imputation
-####
-
-# Get the N & % missingness
-
-missings_n <- apply(data, 2, function(col) {sum(is.na(col))})
-
-write.csv(missings_n,
-          file.path(dir_descriptives, "missings_N.csv"), 
-          row.names = F)
-
-missings_percent <- apply(data, 2, function(col) {((sum(is.na(col)))/length(col)*100)})
-
-write.csv(missings_percent,
-          file.path(dir_descriptives, "missing_stats_percent.csv"), 
-          row.names = F)
-
-# Get summary stats
-
-summarystats <- summary(data) 
-
-write.csv(summarystats,
-          file.path(dir_descriptives, "descriptive_stats.csv"), 
-          row.names = F)
-
-
-# Get the sd for Suppl T 2
-gsisd <- sd(data$gsi, na.rm = T)
-age_m_v2_sd <- sd(data$age_m_v2, na.rm = T)
-gestbir_sd <- sd(data$gestbir, na.rm = T) 
-iq_sd <- sd(data$f0300178, na.rm = T)
-age_sd <- sd(data$agechildbrainmrif9, na.rm = T)
-sd_all <- cbind(gsisd, age_m_v2_sd, gestbir_sd, iq_sd, age_sd)  
-
-write.csv(sd_all,
-          file.path(dir_descriptives, "sds.csv"), 
-          row.names = F)
-
-
-####
-# STEP 8: impute
+# STEP 5: impute
 ####
 
 ### Variables 
