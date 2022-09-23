@@ -1,11 +1,12 @@
 #### PACKAGES ####
-library(QDECR)
-library(mice)
+x <- c("data.table", "foreign", "magrittr", "mice", "QDECR")
+lapply(x, require, character.only = T) 
+setDTthreads(1)
 
 #### Setting Up the Environment ####
 
 # set project date (for later)
-project_date <- "010321"
+project_date <- "150722"
 
 ## set wd
 working_directory <- "PATH/TO/YOUR/WORKING/DIRECTORY"
@@ -29,6 +30,32 @@ imp <- readRDS(file.path(dir_data, paste0("imp30-30_", project_date, ".rds")))
 ## set hemispheres to both lh and rh to loop for both later
 hemis <- c("lh", "rh")
 
+
+### Euler number ###
+aseg_files <- file.path(dir_subj, list.files(dir_subj), "stats", "aseg.stats") 
+aseg_files2 <- aseg_files[file.exists(aseg_files)]
+
+euler_number <- sapply(aseg_files2, function(x) fread(cmd = paste("grep SurfaceHoles", x))$V4[3])
+euler_idc <- sub(".*(v6.0.0//)(.*)(/stats/aseg.stats)", "\\2", aseg_files2)
+euler_data <- data.frame(idc = as.character(euler_idc), euler_number = euler_number)
+
+### Subset ###
+
+imp2 <- lapply(1:imp$m, function(i) {
+  complete(imp, i) %>%
+    merge(euler_data, all.x = TRUE) %>%
+    {.[order(as.numeric(.$idc)), ]} %>%
+    subset(!is.na(imp$data$sum_att_9m)) %>%                            # has ADHD data
+    subset(mri_consent == "yes") %>%                                   # has MRI consent 
+    subset(t1_asset_nii == "NO") %>%                                   # scan type
+    subset(usable_fs_f9_final == "useable") %>%                        # FS quality
+    subset(qdeclgi_f9 == "has data") %>%                               # QDECR
+    subset(braces_mri_f9 == "does not have braces") %>%                # no braces
+    subset(exclude_incidental == "include") %>%                        # no incidental findings
+    subset(twin == "No") %>%                                           # exclude twins
+    subset(!duplicated(mother))                                        # exclude siblings
+})
+
 ### Run the models in QDECR ###
 
 ## Continuous
@@ -36,59 +63,40 @@ hemis <- c("lh", "rh")
 # MODEL 1: inattention, age, sex, ethnicity
 # MODEL 2: maternal education and income and maternal age
 # MODEL 3: maternal psychopathology, cannabis use during pregnancy, smoking during pregnancy
-# MODEL 4: child IQ
+# MODEL 4: 3 + child IQ
+# MODEL 5: 3 + Euler number
 
 # set determinant, and outcome variable, and the covariates for each model
-## Area 
 det <- "sum_att_9m"
-out <- "qdecr_area"
+outs <- c("qdecr_thickness", "qdecr_area", "qdecr_volume")
 
 # change according to the confounders you want to test and to the N models
 conf1 <- c("ethninfv3", "agechildbrainmrif9", "gender")
 conf2 <- c(conf1, "educm5", "income5", "age_m_v2")
 conf3 <- c(conf2, "msmoke", "can_m", "gsi")
 conf4 <- c(conf3, "f0300178")
+conf5 <- c(conf3, "euler_number")
 
 # prepare the regression formula
-conf <- list(conf1, conf2, conf3, conf4)
+conf <- list(conf1, conf2, conf3, conf4, conf5)
 base_f <- lapply(conf, function(x) paste("~", det, "+", paste(x, collapse = " + ")))
-f <- lapply(base_f, function(x) paste(out, x))
+f <- lapply(outs, function(out) lapply(base_f, function(x) paste(out, x)))
 
 # QDECR run 
 ## here for every model (specified as a formula in the f list), 
 # we run a vertex wise analysis, for each hemisphere. 
 for (i in seq_along(f)) {
-  project <- paste0("M", i, "_", project_date)
-  for (hemi in hemis) {
-    vw <- qdecr_fastlm(as.formula(f[[i]]), 
-                       data = imp,
-                       id = "idc",
-                       hemi = hemi,
-                       dir_tmp = dir_tmp,
-                       dir_out = dir_out,
-                       project = project) 
-  }
-  
-}
-
-## Volume
-
-# set outcome to volume now 
-out <- "qdecr_volume"
-
-# adapt formulas with the new out 
-f <- lapply(base_f, function(x) paste(out, x))
-
-# QDECR run 
-for (i in seq_along(f)) {
-  project <- paste0("M", i, "_", project_date)
-  for (hemi in hemis) {
-    vw <- qdecr_fastlm(as.formula(f[[i]]), 
-                       data = imp,
-                       id = "idc",
-                       hemi = hemi,
-                       dir_tmp = dir_tmp,
-                       dir_out = dir_out,
-                       project = project) 
+  for (j in seq_along(f[[i]])) {
+    project <- paste0("M", j, "_", project_date)
+    for (hemi in hemis) {
+      vw <- qdecr_fastlm(as.formula(f[[i]][[j]]), 
+                         data = imp2,
+                         id = "idc",
+                         hemi = hemi,
+                         dir_tmp = dir_tmp,
+                         dir_out = dir_out,
+                         project = project,
+                         clobber = TRUE) 
+    }
   }
 }
