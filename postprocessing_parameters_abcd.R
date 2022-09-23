@@ -47,3 +47,17 @@ out2 <- sub("qdecr_", "", out)
 base_name <- paste0("_", project_date, ".", out2)
 
 m <- length(f) # number of models
+paths_lh <- paths_rh <- list()
+
+for (i in seq_along(out2)) {
+  project_names <- expand.grid(".M", seq_len(m), base_name[i]) %>%
+    apply(1, paste, collapse = "")
+  
+  projects_lh <- paste0("lh", project_names)
+  projects_rh <- paste0("rh", project_names)
+  
+  mid_dir <- rep("dir_out_2022", m)
+  
+  paths_lh[[i]] <- file.path(dir_wd, mid_dir, projects_lh)
+  paths_rh[[i]] <- file.path(dir_wd, mid_dir, projects_rh)
+}
