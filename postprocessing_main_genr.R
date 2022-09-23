@@ -463,8 +463,6 @@ for (qq in seq_along(out2)) {
 	ggplot2::xlab("Average beta coefficient model 2") +
 	ggplot2::ylab("% Change from model 2 to 3")
 
-## Supplementary Figure 10
-
 #### OUT
 
 out <- list(betam = betam, ocn = ocn, roi_list = roi_list, fx = fx)
