@@ -27,15 +27,15 @@ combs <- combn(m, 2, simplify = FALSE)
 fx <- list()
 
 # structure: outcome -> hemisphere -> model
-sem <- betam <- ocn <- list(list(list(), list()), list(list(), list()))
+sem <- betam <- ocn <- list(list(list(), list()), list(list(), list()), list(list(), list()))
 
 # structure: outcome -> model
-roi_m <- list(list(), list())
-roi_med <- list(list(), list())
-roi_s <- list(list(), list())
+roi_m <- list(list(), list(), list())
+roi_med <- list(list(), list(), list())
+roi_s <- list(list(), list(), list())
 
 # structure: outcome -> wide/long
-roi_list <- list(list(), list())
+roi_list <- list(list(), list(), list())
 
 # limits for region figures
 lims <- list(
@@ -73,14 +73,15 @@ for (qq in seq_along(out2)) {
 # create data frames for sign cluster plots
 summary.table <- lapply(seq_along(out2), function(qq) {
   temp <- data.frame(model = paste0("M", 1:m),
-                     n_vertices_sum = c(sapply(ocn[[qq]][[1]], function(x) sum(x > 0)),
-                                        sapply(ocn[[qq]][[2]], function(x) sum(x > 0))),
-                     hemisphere = rep(hemis, each = m)
-  )
+             n_vertices_sum = c(sapply(ocn[[qq]][[1]], function(x) sum(x > 0)),
+                                sapply(ocn[[qq]][[2]], function(x) sum(x > 0))),
+             hemisphere = rep(hemis, each = m)
+             )
   temp$model2 <- dplyr::recode(temp$model, M1 = "1",
-                               M2 = "2",
-                               M3 = "3",
-                               M4 = "3 \n+ IQ")
+                                           M2 = "2",
+                                           M3 = "3",
+                                           M4 = "3 \n+ IQ",
+                                           M5 = "3 \n+ euler")
   temp
 })
 
@@ -90,15 +91,15 @@ for (qq in seq_along(out2)) {
     ocn_temp <- ocn[[qq]][[i]]
     ocn_all <- rep(0, length(ocn_temp[[1]]))
     ocn_all[ocn_temp[[3]]] <- 1
-    
-    ocn_all2 <- ocn_all
-    ocn_all2[ocn_temp[[4]] & ocn_temp[[3]]] <- 2
-    ocn_all2[ocn_temp[[4]] & !ocn_temp[[3]]] <- 3
-    path_temp <- file.path(dir_out, paste0(hemis[i], base_name[qq], "_special_model_3_overlay_to_model4.mgh"))
-    save.mgh(as_mgh(ocn_all2), path_temp)
+    for (j in 4:m) {
+      ocn_all2 <- ocn_all
+      ocn_all2[ocn_temp[[j]] & ocn_temp[[3]]] <- 2
+      ocn_all2[ocn_temp[[j]] & !ocn_temp[[3]]] <- 3
+      path_temp <- file.path(dir_out, paste0(hemis[i], base_name[qq], "_special_model_3_overlay_to_model", j, ".mgh"))
+      save.mgh(as_mgh(ocn_all2), path_temp)
+    }
   }
 }
-
 
 # create delta maps for each model comparison
 for (qq in seq_along(out2)) {
@@ -116,23 +117,23 @@ for (qq in seq_along(out2)) {
 
 # create region-wise data
 for (qq in seq_along(out2)) {
-  
+
   # get betas per region
   for (j in seq_len(m)) {
-    roi_m[[j]] <- aggregate(c(betam[[qq]][[1]][[j]], betam[[qq]][[2]][[j]]), by = list(c(labs[[1]], labs[[2]])), mean, na.rm = TRUE)[1:35, 2]
-    roi_med[[j]] <- aggregate(c(betam[[qq]][[1]][[j]], betam[[qq]][[2]][[j]]), by = list(c(labs[[1]], labs[[2]])), median, na.rm = TRUE)[1:35, 2]
-    roi_s[[j]] <- aggregate(c(betam[[qq]][[1]][[j]], betam[[qq]][[2]][[j]]), by = list(c(labs[[1]], labs[[2]])), sd, na.rm = TRUE)[1:35, 2]
+	roi_m[[j]] <- aggregate(c(betam[[qq]][[1]][[j]], betam[[qq]][[2]][[j]]), by = list(c(labs[[1]], labs[[2]])), mean, na.rm = TRUE)[1:35, 2]
+  roi_med[[j]] <- aggregate(c(betam[[qq]][[1]][[j]], betam[[qq]][[2]][[j]]), by = list(c(labs[[1]], labs[[2]])), median, na.rm = TRUE)[1:35, 2]
+	roi_s[[j]] <- aggregate(c(betam[[qq]][[1]][[j]], betam[[qq]][[2]][[j]]), by = list(c(labs[[1]], labs[[2]])), sd, na.rm = TRUE)[1:35, 2]
   }
   roi_n <- aggregate(c(betam[[qq]][[1]][[1]], betam[[qq]][[2]][[1]]), by = list(c(labs[[1]], labs[[2]])), mean)[, 1]
   
   # wide format
   roi_df <- data.frame(names = roi_n,
-                       model_1 = roi_m[[1]],
-                       model_2 = roi_m[[2]],
-                       model_3 = roi_m[[3]],
-                       s_1 = roi_s[[1]],
-                       s_2 = roi_s[[2]],
-                       s_3 = roi_s[[3]])
+					   model_1 = roi_m[[1]],
+					   model_2 = roi_m[[2]],
+					   model_3 = roi_m[[3]],
+					   s_1 = roi_s[[1]],
+					   s_2 = roi_s[[2]],
+					   s_3 = roi_s[[3]])
   temp_roi_names <- names(roi_df)[-1]
   roi_df$model_12 <- roi_df$model_2 - roi_df$model_1
   roi_df$model_13 <- roi_df$model_3 - roi_df$model_1
@@ -141,12 +142,12 @@ for (qq in seq_along(out2)) {
   roi_df$deltaperc13 <- roi_df$model_13 / roi_df$model_1 * 100
   roi_df$deltaperc23 <- roi_df$model_23 / roi_df$model_2 * 100
   roi_hilo <- order(roi_df$model_1)
-  
+
   # long format
   roi_df2 <- rbind(data.frame(names = roi_n, model = roi_m[[1]], s = roi_s[[1]], time = 1),
-                   data.frame(names = roi_n, model = roi_m[[2]], s = roi_s[[2]], time = 2),
-                   data.frame(names = roi_n, model = roi_m[[3]], s = roi_s[[3]], time = 3)
-  )
+				  data.frame(names = roi_n, model = roi_m[[2]], s = roi_s[[2]], time = 2),
+				  data.frame(names = roi_n, model = roi_m[[3]], s = roi_s[[3]], time = 3)
+				  )
   roi_df2$names <- as.factor(roi_df2$names)
   roi_df2$names <- factor(roi_df2$names, levels = levels(roi_df2$names)[roi_hilo])
   roi_df2$time <- as.factor(roi_df2$time)
@@ -156,84 +157,95 @@ for (qq in seq_along(out2)) {
   
   # format for correlations
   roi_cor <- data.frame(names = roi_n,
-                        mean1 = roi_m[[1]],
-                        mean2 = roi_m[[2]],
-                        mean3 = roi_m[[3]],
-                        mean4 = roi_m[[4]],
+					              mean1 = roi_m[[1]],
+					              mean2 = roi_m[[2]],
+					              mean3 = roi_m[[3]],
+					              mean4 = roi_m[[4]],
+                        mean5 = roi_m[[5]],
                         median1 = roi_med[[1]], 
                         median2 = roi_med[[2]], 
                         median3 = roi_med[[3]], 
-                        median4 = roi_med[[4]]
-  )
-  
+                        median4 = roi_med[[4]],
+                        median5 = roi_med[[5]]
+                        )
+
   roi_list[[qq]] <- list(roi_df, roi_df2, roi_cor)
 }
 
-
 #### FIGURES
 
-## Figure 1
-# file names + paths for overlay plots we want
-overl_name <- expand.grid(hemis, "_", project_date, ".",c("area", "volume"), "_figure_3_overlay_to_model1.mgh" ) %>%
-  apply(1, paste, collapse = "")
-overl_paths <- file.path(dir_out, overl_name)
+## Supplementary Figure 4: Model 1 for KSADS (area/volume/thickness)
+    # file names + paths for overlay plots we want
+    overl_name <- expand.grid(hemis, "_ksads_", project_date, ".", out2, "_figure_3_overlay_to_model1.mgh") %>%
+        apply(1, paste, collapse = "")
+    overl_paths <- file.path(dir_out, overl_name)
+    
+    # some settings
+    overlay_threshold <- c(0.1, 2.5)
+    zoom <- 1
+    cs_size <- 16
+    head_size <- 70
+    text_size <- 70
+    
+    # generate tiff files for left and right hemisphere
+    if (rerun_freeview) {
+      quick_snaps(overl_paths[1], hemis[1], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
+      quick_snaps(overl_paths[2], hemis[2], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
+      quick_snaps(overl_paths[3], hemis[1], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
+      quick_snaps(overl_paths[4], hemis[2], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
+      quick_snaps(overl_paths[5], hemis[1], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
+      quick_snaps(overl_paths[6], hemis[2], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
+    }
+ 
+    # create composite images for left and right, then combine
+    ofig1 <- quick_compose(overl_paths[1], hemis[1], cs = FALSE, text = "Area", text_size = text_size, head = TRUE, head_size = head_size)
+    ofig2 <- quick_compose(overl_paths[2], hemis[2], cs = FALSE, head = TRUE, head_size = head_size)
+    ofig3 <- quick_compose(overl_paths[3], hemis[1], cs = FALSE, text = "Volume", text_size = text_size)
+    ofig4 <- quick_compose(overl_paths[4], hemis[2], cs = FALSE)
+    ofig5 <- quick_compose(overl_paths[5], hemis[1], cs = FALSE, text = "Thickness", text_size = text_size)
+    ofig6 <- quick_compose(overl_paths[6], hemis[2], cs = FALSE)
+    
+    fx$sfig_4 <- list()
+    fx$sfig_4$row1 <- magick::image_append(c(ofig1, ofig2))
+    fx$sfig_4$row2 <- magick::image_append(c(ofig3, ofig4))
+    fx$sfig_4$row3 <- magick::image_append(c(ofig5, ofig6))
 
-# some settings
-overlay_threshold <- c(0.1, 2.5)
-zoom <- 1
-cs_size <- 16
-head_size <- 70
-text_size <- 70
+## Supplementary Figure 5: Model 1 -> 3 for KSADS (area/volume/thickness)
 
-# generate tiff files for left and right hemisphere
-if (rerun_freeview) {
-  quick_snaps(overl_paths[1], hemis[1], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
-  quick_snaps(overl_paths[2], hemis[2], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
-  quick_snaps(overl_paths[3], hemis[1], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
-  quick_snaps(overl_paths[4], hemis[2], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
-}
-
-# create composite images for left and right, then combine
-ofig1 <- quick_compose(overl_paths[1], hemis[1], cs = FALSE, text = "Area", text_size = text_size, head = TRUE, head_size = head_size)
-ofig2 <- quick_compose(overl_paths[2], hemis[2], cs = FALSE, head = TRUE, head_size = head_size)
-ofig3 <- quick_compose(overl_paths[3], hemis[1], cs = FALSE, text = "Volume", text_size = text_size)
-ofig4 <- quick_compose(overl_paths[4], hemis[2], cs = FALSE)
-
-fx$fig_1 <- list()
-fx$fig_1$row1 <- magick::image_append(c(ofig1, ofig2))
-fx$fig_1$row3 <- magick::image_append(c(ofig3, ofig4))
-
-## Figure 3
-
-# file names + paths for overlay plots we want
-overl_name <- expand.grid(hemis, "_", project_date, ".",c("area", "volume"), "_figure_3_overlay_to_model3.mgh" ) %>%
-  apply(1, paste, collapse = "")
-overl_paths <- file.path(dir_out, overl_name)
-
-# some settings
-overlay_threshold <- c(0.1, 2.5)
-zoom <- 1
-cs_size <- 16
-head_size <- 70
-text_size <- 70
-
-# generate tiff files for left and right hemisphere
-if (rerun_freeview) {
-  quick_snaps(overl_paths[1], hemis[1], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
-  quick_snaps(overl_paths[2], hemis[2], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
-  quick_snaps(overl_paths[3], hemis[1], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
-  quick_snaps(overl_paths[4], hemis[2], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
-}
-
-# create composite images for left and right, then combine
-ofig1 <- quick_compose(overl_paths[1], hemis[1], cs = FALSE, text = "Area", text_size = text_size, head = TRUE, head_size = head_size)
-ofig2 <- quick_compose(overl_paths[2], hemis[2], cs = FALSE, head = TRUE, head_size = head_size)
-ofig3 <- quick_compose(overl_paths[3], hemis[1], cs = FALSE, text = "Volume", text_size = text_size)
-ofig4 <- quick_compose(overl_paths[4], hemis[2], cs = FALSE)
-
-fx$fig_3 <- list()
-fx$fig_3$row1 <- magick::image_append(c(ofig1, ofig2))
-fx$fig_3$row3 <- magick::image_append(c(ofig3, ofig4))
+    # file names + paths for overlay plots we want
+    overl_name <- expand.grid(hemis, "_ksads_", project_date, ".", out2, "_figure_3_overlay_to_model3.mgh" ) %>%
+        apply(1, paste, collapse = "")
+    overl_paths <- file.path(dir_out, overl_name)
+    
+    # some settings
+    overlay_threshold <- c(0.1, 2.5)
+    zoom <- 1
+    cs_size <- 16
+    head_size <- 70
+    text_size <- 70
+    
+    # generate tiff files for left and right hemisphere
+    if (rerun_freeview) {
+      quick_snaps(overl_paths[1], hemis[1], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
+      quick_snaps(overl_paths[2], hemis[2], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
+      quick_snaps(overl_paths[3], hemis[1], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
+      quick_snaps(overl_paths[4], hemis[2], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
+      quick_snaps(overl_paths[5], hemis[1], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
+      quick_snaps(overl_paths[6], hemis[2], dir_out, SUBJECTS_DIR, overlay_threshold, overlay_method = "linearopaque")
+    }
+ 
+    # create composite images for left and right, then combine
+    ofig1 <- quick_compose(overl_paths[1], hemis[1], cs = FALSE, text = "Area", text_size = text_size, head = TRUE, head_size = head_size)
+    ofig2 <- quick_compose(overl_paths[2], hemis[2], cs = FALSE, head = TRUE, head_size = head_size)
+    ofig3 <- quick_compose(overl_paths[3], hemis[1], cs = FALSE, text = "Volume", text_size = text_size)
+    ofig4 <- quick_compose(overl_paths[4], hemis[2], cs = FALSE)
+    ofig5 <- quick_compose(overl_paths[5], hemis[1], cs = FALSE, text = "Thickness", text_size = text_size)
+    ofig6 <- quick_compose(overl_paths[6], hemis[2], cs = FALSE)
+    
+    fx$sfig_5 <- list()
+    fx$sfig_5$row1 <- magick::image_append(c(ofig1, ofig2))
+    fx$sfig_5$row2 <- magick::image_append(c(ofig3, ofig4))
+    fx$sfig_5$row3 <- magick::image_append(c(ofig5, ofig6))
 
 #### OUT
 
