@@ -44,7 +44,7 @@ base_f <- lapply(conf, function(x) paste("~", det, "+", paste(x, collapse = "+")
 f <- lapply(base_f, function(x) paste(out, x))
 
 out2 <- sub("qdecr_", "", out)
-base_name <- paste0("_", project_date, ".", out2)
+base_name <- paste0("_abcd_", project_date, ".", out2)
 
 m <- length(f) # number of models
 paths_lh <- paths_rh <- list()
